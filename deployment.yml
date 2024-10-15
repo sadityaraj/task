@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wavity-apache
+  namespace: wavity
+  labels:
+    app: apache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apache
+  template:
+    metadata:
+      labels:
+        app: apache
+    spec:
+      hostname: wavitydevelopmentproxy
+      containers:
+      - name: apache
+        image: wavity/apache:latest   
+        ports:
+        - containerPort: 80   # HTTPS port
+        volumeMounts:
+        - name: apache-config-volume
+          mountPath: /usr/local/apache2/conf/extra/wavity.conf
+          subPath: httpd.conf    
+      volumes:
+      - name: apache-config-volume
+        configMap:
+          name: apache-config
+      imagePullSecrets:
+      - name: docker-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: apache
+  namespace: wavity
+  labels:
+    app: apache
+spec:
+  type: nodePort   # Service type is NodePort
+  selector:
+    app: apache     # This selects the pods with the label "app: apache"
+  ports:
+  - port: 80       # The port the service will expose (HTTPS port)
+    targetPort: 80 # The port on the container (inside the pod)
+    nodePort: 32443 # The NodePort (External port on the node); can be in the range 30000-32767
+    protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: apache-config
+ namespace: wavity
+data:
+ httpd.conf: |
+ ServerName wavitydevelopmentproxy
